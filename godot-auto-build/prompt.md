@@ -19,6 +19,7 @@ Implement the smallest complete workflow:
 - Reuse or update an existing suitable workflow instead of adding a duplicate publisher.
 - Trigger on pushes to the actual default branch and workflow_dispatch. Publish only from that branch. Do not publish pull request or fork code with write credentials.
 - Install the project's Godot version and matching official export templates on an appropriate GitHub-hosted runner. Pin third-party actions to verified commit SHAs and use currently supported action runtimes.
+- Give both editor and export-template downloads bounded retries for transient network failures, including HTTP 429 and 5xx responses. On PowerShell 7, use `Invoke-WebRequest -MaximumRetryCount 3 -RetryIntervalSec 5`; on other runners, use the downloader's equivalent retry and backoff options. Keep failures fatal after retries are exhausted. Do not retry the entire build or change the Godot version to hide a download failure.
 - Use the project's Windows export preset. If none exists, create the smallest suitable Windows x64 preset without changing other platforms or game behavior.
 - Compile required generated resources before import and export. Include runtime data required by the project.
 - Keep tools, archives, temporary files, and export output outside Godot's imported/exported resources, or exclude them explicitly. Keep any local temporary files inside the project or isolated checkout and remove them when no longer needed.
@@ -31,9 +32,9 @@ Implement the smallest complete workflow:
 - Include the download link in the workflow run summary.
 
 Validate and activate:
-1. Check the workflow syntax and applicable project checks. Inspect the diff for unrelated changes.
+1. Check the workflow syntax and applicable project checks. Inspect the diff for unrelated changes. Verify download retry behavior with a controlled transient HTTP failure followed by success, and a persistent failure that stops after the configured attempt limit. Keep this check temporary; no permanent test framework is needed.
 2. Push the setup on a dedicated branch and open a focused pull request. Validate import and export in GitHub Actions before merge, without publishing a test-branch release. Use a temporary branch trigger if needed, then remove it from the final workflow.
-3. Fix failures caused by this setup and rerun the checks. If an existing game problem blocks export, explain the specific blocker. Do not silently change gameplay or report success.
+3. If a run fails, read the failed step's full log and record the exact failing command and error before editing. Distinguish upstream download failures from import, compilation, export, and publication failures. A successful first run does not prove that downloads tolerate transient errors. Fix failures caused by this setup and rerun the checks; retry transient infrastructure failures only a bounded number of times. If an existing game problem blocks export, explain the specific blocker. Do not silently change gameplay or report success. If local log retrieval fails, distinguish that access failure from the CI error; check local proxy settings and try an available authenticated alternative without exposing credentials or disabling TLS verification.
 4. This request authorizes the focused workflow commit, remote branch, pull request, merge, and first test prerelease. Merge once checks pass if repository rules permit. Never bypass required approvals or protections. If a rule blocks progress, finish all independent work and report the exact remaining action.
 5. Verify a real default-branch run completes successfully. Confirm the prerelease contains the expected nonempty Windows ZIP. Do not stop after creating a workflow file or merely starting a run.
 6. Preserve unrelated working files and remove only temporary files you created. Do not add extra planning documents or unrelated repository changes.
